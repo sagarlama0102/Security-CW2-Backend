@@ -19,6 +19,7 @@ import adminPropertyRoutes from './routes/admin/property.route';
 import adminBookingRoutes from "./routes/admin/booking.route";
 import bookingRoutes from "./routes/booking.route";
 import favouriteRoutes from "./routes/favourite.route";
+import { generalLimiter } from "./middlewares/rate-limit.middleware";
 
 const app: Application = express();
 
@@ -80,6 +81,8 @@ app.use(mongoSanitize()); // strips $ and . from req.body, req.params, req.query
 
 // ____ STATIC FILES ____
 app.use("/uploads", express.static(path.join(__dirname, '../uploads')));
+
+app.use(generalLimiter)
 
 // ____ ROUTES ____
 app.use('/api/auth', authRoutes);
