@@ -18,6 +18,14 @@ const UserSchema: Schema = new Schema<UserType>(
         failedLoginAttempts: { type: Number, default: 0 },
         lockUntil: { type: Date, default: null },
         isLocked: { type: Boolean, default: false },
+
+        // ____ PASSWORD POLICY FIELDS ____
+        passwordHistory: { type: [String], default: [] },
+        passwordChangedAt: { type: Date, default: Date.now },
+        passwordExpiresAt: {
+            type: Date,
+            default: () => new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+        },
     },
     {
         timestamps: true, // auto createdAt and updatedAt
@@ -39,6 +47,9 @@ export interface IUser extends UserType, Document { // combine UserType and Docu
     lockUntil: Date | null;
     isLocked: boolean;
     isAccountLocked(): boolean;
+    passwordHistory: string[];
+    passwordChangedAt: Date;
+    passwordExpiresAt: Date;
 }
 
 export const UserModel = mongoose.model<IUser>('User', UserSchema);
