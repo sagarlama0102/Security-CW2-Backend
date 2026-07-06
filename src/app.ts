@@ -23,27 +23,53 @@ import favouriteRoutes from "./routes/favourite.route";
 const app: Application = express();
 
 // _____SECURITY HEADERS ______
-app.use(helmet()); // sets 15+ secure HTTP headers automatically
-app.use(helmet.contentSecurityPolicy({
-    directives: {
-        defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-    }
-}));
-app.use(helmet.hsts({
-    maxAge: 31536000, // 1 year in seconds
-    includeSubDomains: true,
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "blob:"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+        }
+    },
+    hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+    },
+    xPoweredBy: false, // explicitly remove X-Powered-By
 }));
 
 // ____ CORS _____
+
+const allowedOrigins = [
+    "http://localhost:3000",
+    "http://localhost:3003",
+    process.env.CLIENT_URI || ""
+].filter(Boolean);
+
 let corsOptions = {
-    origin: ["http://localhost:3000", "http://localhost:3003"],
+    origin: (origin: string | undefined, callback: Function) => {
+        // allow requests with no origin (mobile apps, curl, postman)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
     optionsSuccessStatus: 200,
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
 }
 app.use(cors(corsOptions));
+
+// _____HTTPS ENFORCEMENT_____
+app.use((req: Request, res: Response, next: Function) => {
+    if (process.env.NODE_ENV === 'production' && !req.secure) {
+        return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+});
 
 // _____ BODY PARSING ____
 app.use(bodyParser.json({ limit: '10kb' })); // limit body size to prevent large payload attacks
