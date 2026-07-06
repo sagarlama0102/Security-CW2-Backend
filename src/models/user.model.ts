@@ -13,17 +13,32 @@ const UserSchema: Schema = new Schema<UserType>(
             type: String,
             enum: ['user', 'admin'],
             default: 'user',
-        }
+        },
+        //______ ACCOUNT LOCKOUT FIELDS ____
+        failedLoginAttempts: { type: Number, default: 0 },
+        lockUntil: { type: Date, default: null },
+        isLocked: { type: Boolean, default: false },
     },
     {
         timestamps: true, // auto createdAt and updatedAt
     }
 );
+// _____METHOD TO CHECK IF ACCOUNT IS LOCKED ____
+UserSchema.methods.isAccountLocked = function () {
+    if (this.lockUntil && this.lockUntil > new Date()) {
+        return true; // still locked
+    }
+    return false;
+};
 
 export interface IUser extends UserType, Document { // combine UserType and Document
     _id: mongoose.Types.ObjectId; // mongo related attribute/ custom attributes
     createdAt: Date;
     updatedAt: Date;
+    failedLoginAttempts: number;
+    lockUntil: Date | null;
+    isLocked: boolean;
+    isAccountLocked(): boolean;
 }
 
 export const UserModel = mongoose.model<IUser>('User', UserSchema);
