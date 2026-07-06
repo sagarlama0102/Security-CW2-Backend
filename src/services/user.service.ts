@@ -36,12 +36,41 @@ export class UserService {
         if(!user){
             throw new HttpError(404, "User not found");
         }
+        // ____CHECK IF ACCOUNT IS LOCKED ____
+        if (user.lockUntil && user.lockUntil > new Date()) {
+            const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
+            throw new HttpError(423, `Account is locked. Try again in ${minutesLeft} minute(s)`);
+        }
         // compare password
         const validPassword = await bcryptjs.compare(data.password, user.password);
         // plaintext, hashed
         if(!validPassword){
-            throw new HttpError(401, "Invalid credentials");
+            const attempts = (user.failedLoginAttempts || 0) + 1;
+        const MAX_ATTEMPTS = 5;
+
+        if (attempts >= MAX_ATTEMPTS) {
+            // lock account for 30 minutes
+            await userRepository.updateUser(user._id.toString(), {
+                failedLoginAttempts: attempts,
+                lockUntil: new Date(Date.now() + 30 * 60 * 1000),
+                isLocked: true,
+            });
+            throw new HttpError(423, "Account locked due to too many failed attempts. Try again in 30 minutes");
         }
+
+        await userRepository.updateUser(user._id.toString(), {
+            failedLoginAttempts: attempts,
+        });
+
+        throw new HttpError(401, `Invalid credentials. ${MAX_ATTEMPTS - attempts} attempt(s) remaining`);
+        }
+
+         // ____RESET FAILED ATTEMPTS ON SUCCESS _____
+        await userRepository.updateUser(user._id.toString(), {
+            failedLoginAttempts: 0,
+            lockUntil: null,
+            isLocked: false,
+        });
         // generate jwt
         const payload = { // user identifier
             id: user._id,
