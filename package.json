@@ -28,6 +28,8 @@
     "nodemailer": "^8.0.0",
     "ts-jest": "^29.4.6",
     "uuid": "^12.0.0",
+    "winston": "^3.19.0",
+    "winston-mongodb": "^7.0.1",
     "zod": "^4.2.1",
     "zxcvbn": "^4.4.2"
   },
