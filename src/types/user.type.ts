@@ -9,6 +9,10 @@ export const UserSchema = z.object({
     phoneNumber: z.string().optional(),
     role: z.enum(["user", "admin"]).default("user"),
     profilePicture: z.string().nullable().optional(),
+    // ____ ACCOUNT LOCKOUT FIELDS ____
+    failedLoginAttempts: z.number().default(0).optional(),
+    lockUntil: z.date().nullable().optional(),
+    isLocked: z.boolean().default(false).optional(),
     
 });
 
