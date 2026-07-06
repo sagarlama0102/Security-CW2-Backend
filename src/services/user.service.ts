@@ -5,6 +5,7 @@ import { HttpError } from "../errors/http-error";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../config";
 import { sendEmail } from "../config/email";
+import { validatePasswordStrength } from '../middlewares/password-policy.middleware';
 
 let userRepository = new UserRepository();
 
@@ -22,8 +23,13 @@ export class UserService {
         if(usernameCheck){
             throw new HttpError(403, "Username already in use");
         }
+        // check password strength
+        const { isValid, errors } = validatePasswordStrength(data.password);
+        if (!isValid) {
+            throw new HttpError(400, errors.join(', '));
+        }
         // hash password
-        const hashedPassword = await bcryptjs.hash(data.password, 10); // 10 - complexity
+        const hashedPassword = await bcryptjs.hash(data.password, 12); // 12 - complexity
         data.password = hashedPassword;
 
         // create user
@@ -63,6 +69,10 @@ export class UserService {
         });
 
         throw new HttpError(401, `Invalid credentials. ${MAX_ATTEMPTS - attempts} attempt(s) remaining`);
+        }
+        // ===== CHECK IF PASSWORD IS EXPIRED =====
+        if (user.passwordExpiresAt && user.passwordExpiresAt < new Date()) {
+            throw new HttpError(403, 'Your password has expired. Please reset your password to continue');
         }
 
          // ____RESET FAILED ATTEMPTS ON SUCCESS _____
@@ -106,8 +116,28 @@ export class UserService {
             }
         }
         if(data.password){
-            const hashedPassword = await bcryptjs.hash(data.password, 10);
+            // validate password strength
+            const { isValid, errors } = validatePasswordStrength(data.password);
+            if (!isValid) {
+                throw new HttpError(400, errors.join(', '));
+            }
+            const hashedPassword = await bcryptjs.hash(data.password, 12);
+            // check password history - prevent reuse of last 5 passwords
+            const recentPasswords = user.passwordHistory || [];
+            for (const oldPassword of recentPasswords) {
+                const isSame = await bcryptjs.compare(data.password, oldPassword);
+                if (isSame) {
+                    throw new HttpError(400, 'You cannot reuse any of your last 5 passwords');
+                }
+            }
+                // add current password to history before updating
+            const updatedHistory = [user.password, ...recentPasswords].slice(0, 5);
+
             data.password = hashedPassword;
+            (data as any).passwordHistory = updatedHistory;
+            (data as any).passwordChangedAt = new Date();
+            (data as any).passwordExpiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+            
         }
         const updatedUser = await userRepository.updateOneUser(userId, data);
         return updatedUser;
