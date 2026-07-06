@@ -13,6 +13,10 @@ export const UserSchema = z.object({
     failedLoginAttempts: z.number().default(0).optional(),
     lockUntil: z.date().nullable().optional(),
     isLocked: z.boolean().default(false).optional(),
+    // _____ PASSWORD POLICY FIELDS ______
+    passwordHistory: z.array(z.string()).default([]).optional(),
+    passwordChangedAt: z.date().optional(),
+    passwordExpiresAt: z.date().optional(),
     
 });
 
