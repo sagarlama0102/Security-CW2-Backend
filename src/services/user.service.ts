@@ -7,6 +7,7 @@ import { JWT_SECRET } from "../config";
 import { sendEmail } from "../config/email";
 import { validatePasswordStrength } from '../middlewares/password-policy.middleware';
 import { logActivity,ActivityActions } from "../config/activity_logger";
+import crypto from 'crypto';
 
 let userRepository = new UserRepository();
 
@@ -110,15 +111,56 @@ export class UserService {
             role: user.role
         }
         const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' }); // 30 days
+        // ===== GENERATE REFRESH TOKEN (long lived) =====
+const refreshToken = crypto.randomBytes(64).toString('hex');
+
+// save refresh token to database
+await userRepository.updateUser(user._id.toString(), {
+    refreshToken: refreshToken,
+});
         logActivity({
     userId: user._id.toString(),
     action: ActivityActions.LOGIN_SUCCESS,
     status: 'success',
     details: { email: user.email }
 });
-        return { token, user }
+        return { token, refreshToken, user }
         
     }
+    async refreshAccessToken(refreshToken: string) {
+    if (!refreshToken) {
+        throw new HttpError(401, 'Refresh token is required');
+    }
+
+    // find user with this refresh token
+    const user = await userRepository.getUserByRefreshToken(refreshToken);
+    if (!user) {
+        throw new HttpError(401, 'Invalid refresh token');
+    }
+
+    // generate new access token
+    const payload = {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+    }
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+    return { accessToken };
+}
+
+async logout(userId: string) {
+    // invalidate refresh token on logout
+    await userRepository.updateUser(userId, { refreshToken: null });
+    logActivity({
+        userId,
+        action: ActivityActions.LOGOUT,
+        status: 'success',
+        details: {}
+    });
+}
     async getUserById(userId: string){
         const user = await userRepository.getUserById(userId);
         if(!user){
