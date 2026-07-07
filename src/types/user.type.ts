@@ -18,6 +18,8 @@ export const UserSchema = z.object({
     passwordChangedAt: z.date().optional(),
     passwordExpiresAt: z.date().optional(),
     
+    refreshToken: z.string().nullable().optional(),
+    
 });
 
 export type UserType = z.infer<typeof UserSchema>;
