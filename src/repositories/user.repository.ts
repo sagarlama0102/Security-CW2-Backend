@@ -6,6 +6,7 @@ export interface IUserRepository {
     // Additional
     // 5 common database queries for entity
     createUser(userData: Partial<IUser>): Promise<IUser>;
+    getUserByRefreshToken(refreshToken: string): Promise<IUser | null>;
     getUserById(id: string): Promise<IUser | null>;
     getAllUsers(
         page: number, size: number, search?: string
@@ -22,6 +23,10 @@ export class UserRepository implements IUserRepository {
     async createUser(userData: Partial<IUser>): Promise<IUser> {
         const user = new UserModel(userData); 
         return await user.save();
+    }
+    async getUserByRefreshToken(refreshToken: string): Promise<IUser | null> {
+    const user = await UserModel.findOne({ refreshToken });
+    return user;
     }
     async getUserByEmail(email: string): Promise<IUser | null> {
         const user = await UserModel.findOne({ "email": email })
