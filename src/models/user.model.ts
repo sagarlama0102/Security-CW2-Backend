@@ -26,6 +26,8 @@ const UserSchema: Schema = new Schema<UserType>(
             type: Date,
             default: () => new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
         },
+        // ===== JWT FIELDS =====
+        refreshToken: { type: String, default: null },
     },
     {
         timestamps: true, // auto createdAt and updatedAt
@@ -50,6 +52,7 @@ export interface IUser extends UserType, Document { // combine UserType and Docu
     passwordHistory: string[];
     passwordChangedAt: Date;
     passwordExpiresAt: Date;
+    refreshToken: string | null;
 }
 
 export const UserModel = mongoose.model<IUser>('User', UserSchema);
