@@ -33,9 +33,9 @@ export class AuthController {
                 )
             }
             const loginData: LoginUserDTO = parsedData.data;
-            const { token, user } = await userService.loginUser(loginData);
+            const { token,refreshToken, user } = await userService.loginUser(loginData);
             return res.status(200).json(
-                { success: true, message: "Login successful", data: user, token }
+                { success: true, message: "Login successful", data: user, token, refreshToken }
             );
 
         } catch (error: Error | any) {
@@ -44,6 +44,44 @@ export class AuthController {
             );
         }
     }
+    async refreshToken(req: Request, res: Response) {
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken) {
+            return res.status(401).json({ success: false, message: 'Refresh token is required' });
+        }
+        const { accessToken } = await userService.refreshAccessToken(refreshToken);
+        return res.status(200).json({
+            success: true,
+            message: 'Access token refreshed',
+            accessToken
+        });
+    } catch (error: Error | any) {
+        return res.status(error.statusCode ?? 500).json({
+            success: false,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+}
+
+async logout(req: Request, res: Response) {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        await userService.logout(userId.toString());
+        return res.status(200).json({
+            success: true,
+            message: 'Logged out successfully'
+        });
+    } catch (error: Error | any) {
+        return res.status(error.statusCode ?? 500).json({
+            success: false,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+}
     async getProfile(req: Request, res: Response){
         try{
             const userId = req.user?._id;
