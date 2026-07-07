@@ -22,4 +22,7 @@ router.put(
 router.post("/request-password-reset", passwordResetLimiter, authController.sendResetPasswordEmail);
 router.post("/reset-password/:token", passwordResetLimiter, authController.resetPassword);
 
+router.post("/refresh-token", authController.refreshToken);
+router.post("/logout", authorizationMiddleware, authController.logout);
+
 export default router;
