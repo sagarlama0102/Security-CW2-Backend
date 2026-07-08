@@ -4,12 +4,13 @@ import { authorizationMiddleware } from "../middlewares/authorization.middleware
 import { uploads } from "../middlewares/upload.middleware";
 import { authLimiter, passwordResetLimiter, generalLimiter } from "../middlewares/rate-limit.middleware";
 import { passwordPolicyMiddleware } from "../middlewares/password-policy.middleware";
+import { verifyCaptcha } from "../middlewares/captcha.middleware";
 
 let authController = new AuthController();
 const router = Router();
 
-router.post("/register", authLimiter, passwordPolicyMiddleware, authController.register);
-router.post("/login", authLimiter, authController.login);
+router.post("/register", authLimiter,verifyCaptcha, passwordPolicyMiddleware, authController.register);
+router.post("/login", authLimiter,verifyCaptcha, authController.login);
 
 router.get("/whoami", authorizationMiddleware, authController.getProfile);
 router.put(
