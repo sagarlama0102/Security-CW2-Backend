@@ -20,6 +20,7 @@ import adminBookingRoutes from "./routes/admin/booking.route";
 import bookingRoutes from "./routes/booking.route";
 import favouriteRoutes from "./routes/favourite.route";
 import { generalLimiter } from "./middlewares/rate-limit.middleware";
+import mfaRoutes from './routes/mfa.route';
 
 const app: Application = express();
 
@@ -92,6 +93,7 @@ app.use('/api/admin/properties', adminPropertyRoutes);
 app.use("/api/admin/bookings", adminBookingRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/favourites", favouriteRoutes);
+app.use('/api/mfa', mfaRoutes);
 
 app.get('/', (req: Request, res: Response) => {
     return res.status(200).json({ success: "true", message: "Welcome to the RentEase API" });
