@@ -19,6 +19,11 @@ export const UserSchema = z.object({
     passwordExpiresAt: z.date().optional(),
     
     refreshToken: z.string().nullable().optional(),
+
+    // _____ MFA FIELDS _____
+    mfaEnabled: z.boolean().default(false).optional(),
+    mfaSecret: z.string().nullable().optional(),
+    mfaVerified: z.boolean().default(false).optional(),
     
 });
 
