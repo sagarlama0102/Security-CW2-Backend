@@ -250,6 +250,73 @@ async logout(userId: string) {
             throw new HttpError(400, "Invalid or expired token");
         }
     }
+// ________ EXPORT USER DATA (GDPR) _________
+async exportUserData(userId: string) {
+    const user = await userRepository.getUserById(userId);
+    if (!user) {
+        throw new HttpError(404, "User not found");
+    }
 
+    // build export object - EXCLUDE sensitive fields
+    const exportData = {
+        profile: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            profilePicture: user.profilePicture,
+            role: user.role,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        },
+        security: {
+            mfaEnabled: user.mfaEnabled,
+            passwordChangedAt: user.passwordChangedAt,
+            passwordExpiresAt: user.passwordExpiresAt,
+        },
+        exportedAt: new Date().toISOString(),
+        exportFormat: 'JSON',
+        notice: 'This export excludes sensitive data such as passwords and tokens for security reasons'
+    };
+
+    logActivity({
+        userId,
+        action: 'DATA_EXPORT',
+        status: 'success',
+        details: { email: user.email }
+    });
+
+    return exportData;
+}
+
+// ______ IMPORT USER DATA (GDPR) ______
+async importUserData(userId: string, data: any) {
+    const user = await userRepository.getUserById(userId);
+    if (!user) {
+        throw new HttpError(404, "User not found");
+    }
+
+    // only allow importing safe profile fields
+    const allowedFields: any = {};
+    if (data.profile) {
+        if (data.profile.firstName) allowedFields.firstName = data.profile.firstName;
+        if (data.profile.lastName) allowedFields.lastName = data.profile.lastName;
+        if (data.profile.phoneNumber) allowedFields.phoneNumber = data.profile.phoneNumber;
+        if (data.profile.profilePicture) allowedFields.profilePicture = data.profile.profilePicture;
+    }
+
+    // NEVER import role, password, email, username, mfa or security fields
+    const updatedUser = await userRepository.updateOneUser(userId, allowedFields);
+
+    logActivity({
+        userId,
+        action: 'DATA_IMPORT',
+        status: 'success',
+        details: { email: user.email, importedFields: Object.keys(allowedFields) }
+    });
+
+    return updatedUser;
+}
     
 }
