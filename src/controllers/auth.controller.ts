@@ -164,5 +164,44 @@ async logout(req: Request, res: Response) {
             );
         }
     }
+    async exportData(req: Request, res: Response) {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const data = await userService.exportUserData(userId.toString());
+
+        // set headers to trigger download
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', 'attachment; filename=my-data-export.json');
+        return res.status(200).json(data);
+    } catch (error: Error | any) {
+        return res.status(error.statusCode ?? 500).json({
+            success: false,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+}
+
+async importData(req: Request, res: Response) {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized' });
+        }
+        const updatedUser = await userService.importUserData(userId.toString(), req.body);
+        return res.status(200).json({
+            success: true,
+            message: 'Data imported successfully',
+            data: updatedUser
+        });
+    } catch (error: Error | any) {
+        return res.status(error.statusCode ?? 500).json({
+            success: false,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+}
     
 }
