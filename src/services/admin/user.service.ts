@@ -2,6 +2,7 @@ import { UserRepository } from "../../repositories/user.repository";
 import bcryptjs from "bcryptjs";
 import { HttpError } from "../../errors/http-error";
 import { CreateUserDTO, LoginUserDTO, UpdateUserDTO } from "../../dtos/user.dto";
+import { validatePasswordStrength } from '../../middlewares/password-policy.middleware';
 
 
 let userRepository = new UserRepository();
@@ -16,8 +17,12 @@ export class AdminUserService {
         if(usernameCheck){
             throw new HttpError(403, "Username already in use");
         }
+        const { isValid, errors } = validatePasswordStrength(data.password);
+        if (!isValid) {
+            throw new HttpError(400, errors.join(', '));
+        }
         //hash password
-        const hashedPassword = await bcryptjs.hash(data.password, 10);
+        const hashedPassword = await bcryptjs.hash(data.password, 12);
         data.password = hashedPassword;
 
         const newUser = await userRepository.createUser(data);
