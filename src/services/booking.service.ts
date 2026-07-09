@@ -3,6 +3,7 @@ import { PropertyRepository } from "../repositories/property.repository";
 import { CreateBookingDTO } from "../dtos/booking.dto";
 import { BookingStatusEnum } from "../types/booking.types";
 import { HttpError } from "../errors/http-error";
+import { logActivity, ActivityActions } from "../config/activity_logger";
 
 // Instantiate repositories
 const bookingRepository = new BookingRepository();
@@ -83,7 +84,13 @@ export class BookingService {
     // Using string conversion to ensure safe comparison
     const ownerId = booking.user._id ? booking.user._id.toString() : booking.user.toString();
     if (ownerId !== userId) {
-      throw new HttpError(403, "You are not authorized to cancel this booking");
+      logActivity({
+        userId,
+        action: ActivityActions.UNAUTHORIZED_ACCESS,
+        status: 'failure',
+        details: { resource: 'booking', resourceId: bookingId, attemptedAction: 'cancel' }
+    });
+    throw new HttpError(403, "You are not authorized to cancel this booking");
     }
 
     // Logic: Only allow cancellation if the request hasn't been processed yet
