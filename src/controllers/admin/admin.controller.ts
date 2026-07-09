@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from "express";
 import z from "zod";
 import { CreateUserDTO, LoginUserDTO, UpdateUserDTO } from "../../dtos/user.dto";
 import { QueryParams } from "../../types/query.type";
+import { logActivity, ActivityActions } from "../../config/activity_logger";
 
 let adminUserService = new AdminUserService();
 
@@ -61,20 +62,7 @@ export class AdminUserController {
             )
         }
     }
-    async updateOneUser(req:Request, res:Response){
-        try{
-            const userId = req.params.id;
-            const data = req.params.id;
-            const user = await adminUserService.updateOneUser(userId, data);
-            return res.status(200).json(
-                {success:true, message:"User Updated"}
-            )
-        }catch(error: Error | any){
-            return res.status(error.statusCode || 500).json(
-                {success:false, message: error.message || "Internal Server Error"}
-            );
-        }
-    }
+
     async deleteOneUser(req:Request, res:Response){
         try{
             const userId = req.params.id;
@@ -118,12 +106,28 @@ export class AdminUserController {
     async deleteUser(req: Request, res: Response, next: NextFunction) {
         try {
             const userId = req.params.id;
+            const adminId = req.user?._id;
+
+            // prevent admin from deleting their own account
+            if (userId === adminId?.toString()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Admins cannot delete their own account"
+                });
+            }
             const deleted = await adminUserService.deleteUser(userId);
             if (!deleted) {
                 return res.status(404).json(
                     { success: false, message: "User not found" }
                 );
             }
+            // audit log the deletion
+            logActivity({
+                userId: adminId?.toString(),
+                action: ActivityActions.ADMIN_USER_DELETED,
+                status: 'success',
+                details: { deletedUserId: userId }
+            });
             return res.status(200).json(
                 { success: true, message: "User Deleted" }
             );
