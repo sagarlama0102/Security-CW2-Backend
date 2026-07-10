@@ -16,11 +16,16 @@ let userRepository = new UserRepository();
 
 export const authorizationMiddleware = async(req: Request, res: Response, next: NextFunction) =>{
     try{
+        let token: string | undefined;
+
         const authHeader = req.headers.authorization;
-        if(!authHeader || !authHeader.startsWith("Bearer")){
-            throw new HttpError(401, "Unauthorized, header malformed");
+        if (authHeader && authHeader.startsWith("Bearer")) {
+            token = authHeader.split(" ")[1];
+        } else if (req.cookies && req.cookies.accessToken) {
+            // fall back to reading token from secure HttpOnly cookie
+            token = req.cookies.accessToken;
         }
-        const token = authHeader.split(" ")[1]; // "Beared <string>" [1] -> <string>
+
         if(!token){
             throw new HttpError(401, "Unauthorized, token missing");
         }
