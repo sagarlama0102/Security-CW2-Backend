@@ -2,6 +2,8 @@ import { UserService } from "../services/user.service";
 import { CreateUserDTO, LoginUserDTO, UpdateUserDTO } from "../dtos/user.dto";
 import { Request, Response } from "express";
 import z from "zod";
+import { secureCookieOptions, clearCookieOptions } from '../config/cookie-options';
+
 let userService = new UserService();
 export class AuthController {
     async register(req: Request, res: Response) {
@@ -34,6 +36,10 @@ export class AuthController {
             }
             const loginData: LoginUserDTO = parsedData.data;
             const { token,refreshToken, user } = await userService.loginUser(loginData);
+
+            // set token as secure HttpOnly cookie
+            res.cookie('accessToken', token, secureCookieOptions);
+            res.cookie('refreshToken', refreshToken, secureCookieOptions);
             return res.status(200).json(
                 { success: true, message: "Login successful", data: user, token, refreshToken }
             );
@@ -71,6 +77,11 @@ async logout(req: Request, res: Response) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
         await userService.logout(userId.toString());
+        
+        // clear the auth cookies
+        res.clearCookie('accessToken', clearCookieOptions);
+        res.clearCookie('refreshToken', clearCookieOptions);
+
         return res.status(200).json({
             success: true,
             message: 'Logged out successfully'
