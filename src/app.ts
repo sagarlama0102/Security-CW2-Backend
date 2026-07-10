@@ -8,6 +8,7 @@ import path from 'path';
 import { HttpError } from './errors/http-error';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 console.log(process.env.PORT);
@@ -76,6 +77,7 @@ app.use((req: Request, res: Response, next: Function) => {
 // _____ BODY PARSING ____
 app.use(bodyParser.json({ limit: '10kb' })); // limit body size to prevent large payload attacks
 app.use(bodyParser.urlencoded({ extended: true, limit: '10kb' }));
+app.use(cookieParser());
 
 // _____ SANITIZATION _____
 app.use(mongoSanitize()); // strips $ and . from req.body, req.params, req.query to prevent NoSQL injection
