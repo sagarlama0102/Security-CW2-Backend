@@ -8,6 +8,7 @@ import { sendEmail } from "../config/email";
 import { validatePasswordStrength } from '../middlewares/password-policy.middleware';
 import { logActivity,ActivityActions } from "../config/activity_logger";
 import crypto from 'crypto';
+import speakeasy from 'speakeasy';
 
 let userRepository = new UserRepository();
 
@@ -101,6 +102,31 @@ export class UserService {
             lockUntil: null,
             isLocked: false,
         });
+        if (user.mfaEnabled) {
+    // issue a SHORT-LIVED temporary token that ONLY allows MFA verification
+    // it carries a distinct purpose claim so it can't be used as a session token
+    const tempToken = jwt.sign(
+        { id: user._id, purpose: 'mfa_pending' },
+        JWT_SECRET,
+        { expiresIn: '5m' } // 5 minutes to enter the code
+    );
+
+    logActivity({
+        userId: user._id.toString(),
+        action: 'MFA_CHALLENGE_ISSUED',
+        status: 'success',
+        details: { email: user.email }
+    });
+
+    // NOTE: no session token, no refresh token issued here
+    return {
+        mfaRequired: true,
+        tempToken,
+        user: null,
+        token: null,
+        refreshToken: null,
+    };
+}
         // generate jwt
         const payload = { // user identifier
             id: user._id,
@@ -124,7 +150,7 @@ await userRepository.updateUser(user._id.toString(), {
     status: 'success',
     details: { email: user.email }
 });
-        return { token, refreshToken, user }
+        return { mfaRequired: false, token, refreshToken, user }
         
     }
     async refreshAccessToken(refreshToken: string) {
@@ -210,6 +236,76 @@ async logout(userId: string) {
         const updatedUser = await userRepository.updateOneUser(userId, data);
         return updatedUser;
     }
+    // ===== COMPLETE LOGIN AFTER MFA CODE IS VERIFIED =====
+async verifyMFALogin(tempToken: string, mfaCode: string) {
+    if (!tempToken || !mfaCode) {
+        throw new HttpError(400, 'Token and MFA code are required');
+    }
+
+    // verify the temp token
+    let decoded: any;
+    try {
+        decoded = jwt.verify(tempToken, JWT_SECRET);
+    } catch (err) {
+        throw new HttpError(401, 'MFA session expired. Please log in again');
+    }
+
+    // make sure this token was issued for MFA, not a normal session token
+    if (decoded.purpose !== 'mfa_pending') {
+        throw new HttpError(401, 'Invalid MFA token');
+    }
+
+    const user = await userRepository.getUserById(decoded.id);
+    if (!user) {
+        throw new HttpError(404, 'User not found');
+    }
+    if (!user.mfaEnabled || !user.mfaSecret) {
+        throw new HttpError(400, 'MFA is not enabled for this account');
+    }
+
+    // verify the 6 digit TOTP code
+    const isValid = speakeasy.totp.verify({
+        secret: user.mfaSecret,
+        encoding: 'base32',
+        token: mfaCode,
+        window: 1,
+    });
+
+    if (!isValid) {
+        logActivity({
+            userId: user._id.toString(),
+            action: 'MFA_VERIFICATION_FAILED',
+            status: 'failure',
+            details: { email: user.email }
+        });
+        throw new HttpError(401, 'Invalid MFA code');
+    }
+
+    // BOTH factors verified - NOW issue the real session token
+    const payload = {
+        id: user._id,
+        email: user.email,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+    }
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+    const refreshToken = crypto.randomBytes(64).toString('hex');
+
+    await userRepository.updateUser(user._id.toString(), {
+        refreshToken: refreshToken,
+    });
+
+    logActivity({
+        userId: user._id.toString(),
+        action: ActivityActions.LOGIN_SUCCESS,
+        status: 'success',
+        details: { email: user.email, method: 'password + MFA' }
+    });
+
+    return { token, refreshToken, user };
+}
 
     async sendResetPasswordEmail(email?: string) {
         if (!email) {
