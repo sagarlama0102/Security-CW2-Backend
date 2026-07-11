@@ -10,31 +10,35 @@ export class MFAService {
 
     // ===== GENERATE MFA SECRET AND QR CODE =====
     async setupMFA(userId: string) {
-        const user = await userRepository.getUserById(userId);
-        if (!user) {
-            throw new HttpError(404, 'User not found');
-        }
-
-        // generate secret
-        const secret = speakeasy.generateSecret({
-            name: `RentEase (${user.email})`,
-            issuer: 'RentEase',
-        });
-
-        // save secret to user (not verified yet)
-        await userRepository.updateUser(userId, {
-            mfaSecret: secret.base32,
-            mfaVerified: false,
-        });
-
-        // generate QR code
-        const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
-
-        return {
-            secret: secret.base32,
-            qrCode: qrCodeUrl,
-        };
+    const user = await userRepository.getUserById(userId);
+    if (!user) {
+        throw new HttpError(404, 'User not found');
     }
+
+    // ===== GUARD: prevent overwriting an active MFA secret =====
+    // without this, calling setup again would invalidate the user's
+    // existing authenticator entry and lock them out of their account
+    if (user.mfaEnabled) {
+        throw new HttpError(400, 'MFA is already enabled. Disable it first to reconfigure');
+    }
+
+    const secret = speakeasy.generateSecret({
+        name: `RentEase (${user.email})`,
+        issuer: 'RentEase',
+    });
+
+    await userRepository.updateUser(userId, {
+        mfaSecret: secret.base32,
+        mfaVerified: false,
+    });
+
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
+
+    return {
+        secret: secret.base32,
+        qrCode: qrCodeUrl,
+    };
+}
 
     // ===== VERIFY MFA TOKEN AND ENABLE MFA _____
     async verifyAndEnableMFA(userId: string, token: string) {
@@ -110,6 +114,7 @@ export class MFAService {
 
         return { verified: true };
     }
+    
 
     // _____ DISABLE MFA ____
     async disableMFA(userId: string, token: string) {
