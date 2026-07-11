@@ -7,7 +7,7 @@ import cors from "cors";
 import path from 'path';
 import { HttpError } from './errors/http-error';
 import helmet from 'helmet';
-import mongoSanitize from 'express-mongo-sanitize';
+import { sanitizeRequest } from './middlewares/sanitize.middleware';
 import cookieParser from 'cookie-parser';
 
 dotenv.config();
@@ -79,8 +79,8 @@ app.use(bodyParser.json({ limit: '10kb' })); // limit body size to prevent large
 app.use(bodyParser.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 
-// _____ SANITIZATION _____
-app.use(mongoSanitize()); // strips $ and . from req.body, req.params, req.query to prevent NoSQL injection
+// // _____ SANITIZATION _____
+app.use(sanitizeRequest);// custom Express 5 compatible NoSQL injection prevention
 
 // ____ STATIC FILES ____
 app.use("/uploads", express.static(path.join(__dirname, '../uploads')));
