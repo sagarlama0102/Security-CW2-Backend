@@ -11,6 +11,7 @@ const router = Router();
 
 router.post("/register", authLimiter,verifyCaptcha, passwordPolicyMiddleware, authController.register);
 router.post("/login", authLimiter,verifyCaptcha, authController.login);
+router.post("/verify-mfa-login", authLimiter, authController.verifyMFALogin);
 
 router.get("/whoami", authorizationMiddleware, authController.getProfile);
 router.put(
