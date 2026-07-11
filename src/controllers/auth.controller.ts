@@ -35,13 +35,23 @@ export class AuthController {
                 )
             }
             const loginData: LoginUserDTO = parsedData.data;
-            const { token,refreshToken, user } = await userService.loginUser(loginData);
+            const result = await userService.loginUser(loginData);
 
+            // ===== MFA REQUIRED - do not issue session yet =====
+        if (result.mfaRequired) {
+            return res.status(200).json({
+                success: true,
+                mfaRequired: true,
+                tempToken: result.tempToken,
+                message: 'Enter the 6-digit code from your authenticator app'
+            });
+        }
+    
             // set token as secure HttpOnly cookie
-            res.cookie('accessToken', token, secureCookieOptions);
-            res.cookie('refreshToken', refreshToken, secureCookieOptions);
+            res.cookie('accessToken', result.token!, secureCookieOptions);
+            res.cookie('refreshToken', result.refreshToken!, secureCookieOptions);
             return res.status(200).json(
-                { success: true, message: "Login successful", data: user, token, refreshToken }
+                { success: true, mfaRequired: false, message: "Login successful", data: result.user, token: result.token, refreshToken: result.refreshToken }
             );
 
         } catch (error: Error | any) {
@@ -61,6 +71,35 @@ export class AuthController {
             success: true,
             message: 'Access token refreshed',
             accessToken
+        });
+    } catch (error: Error | any) {
+        return res.status(error.statusCode ?? 500).json({
+            success: false,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+}
+async verifyMFALogin(req: Request, res: Response) {
+    try {
+        const { tempToken, mfaCode } = req.body;
+        if (!tempToken || !mfaCode) {
+            return res.status(400).json({
+                success: false,
+                message: 'Temp token and MFA code are required'
+            });
+        }
+
+        const { token, refreshToken, user } = await userService.verifyMFALogin(tempToken, mfaCode);
+
+        res.cookie('accessToken', token, secureCookieOptions);
+        res.cookie('refreshToken', refreshToken, secureCookieOptions);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            data: user,
+            token,
+            refreshToken
         });
     } catch (error: Error | any) {
         return res.status(error.statusCode ?? 500).json({
