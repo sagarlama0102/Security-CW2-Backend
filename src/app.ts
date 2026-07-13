@@ -9,6 +9,7 @@ import { HttpError } from './errors/http-error';
 import helmet from 'helmet';
 import { sanitizeRequest } from './middlewares/sanitize.middleware';
 import cookieParser from 'cookie-parser';
+import multer from 'multer'; 
 
 dotenv.config();
 console.log(process.env.PORT);
@@ -82,8 +83,18 @@ app.use(cookieParser());
 // // _____ SANITIZATION _____
 app.use(sanitizeRequest);// custom Express 5 compatible NoSQL injection prevention
 
-// ____ STATIC FILES ____
-app.use("/uploads", express.static(path.join(__dirname, '../uploads')));
+// ===== SECURE STATIC FILE SERVING =====
+// force safe headers so uploaded files can never execute as active content
+app.use("/uploads", express.static(path.join(__dirname, '../uploads'), {
+    setHeaders: (res) => {
+        // stop the browser from MIME-sniffing the file into something executable
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        // force download instead of inline rendering (neutralizes SVG/HTML script execution)
+        res.setHeader('Content-Disposition', 'attachment');
+        // extra CSP layer specifically for served files
+        res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'none'; sandbox");
+    }
+}));
 
 app.use(generalLimiter)
 
@@ -103,6 +114,16 @@ app.get('/', (req: Request, res: Response) => {
 
 // _____ GLOBAL ERROR HANDLER ____
 app.use((err: Error, req: Request, res: Response, next: Function) => {
+    // ===== MULTER / FILE UPLOAD ERRORS =====
+    if (err instanceof multer.MulterError) {
+        // e.g. file too large, too many files
+        return res.status(400).json({ success: false, message: `Upload error: ${err.message}` });
+    }
+    // our custom fileFilter errors (invalid type/extension)
+    if (err.message && (err.message.includes('Invalid file') || err.message.includes('image'))) {
+        return res.status(400).json({ success: false, message: err.message });
+    }
+
     if (err instanceof HttpError) {
         return res.status(err.statusCode).json({ success: false, message: err.message });
     }
